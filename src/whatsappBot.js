@@ -4,27 +4,35 @@ const BirthdayManager = require('./birthdayManager');
 
 class WhatsAppBot {
     constructor() {
+        // Render-specific Chrome configuration
+        const puppeteerConfig = {
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
+            ]
+        };
+
+        // Only set executablePath if we have a custom one
+        if (process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH) {
+            puppeteerConfig.executablePath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
+        }
+
         this.client = new Client({
             authStrategy: new LocalAuth(),
-            puppeteer: {
-                executablePath: process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
-            }
+            puppeteer: puppeteerConfig
         });
         this.isReady = false;
         this.groupId = null;
         this.birthdayManager = new BirthdayManager();
+        this.lastQR = null;
         
         this.setupEventListeners();
     }
@@ -32,6 +40,9 @@ class WhatsAppBot {
     setupEventListeners() {
         this.client.on('qr', (qr) => {
             console.log('Scan the QR code below with WhatsApp:');
+            console.log('QR Code Raw String:', qr);
+            console.log('Visit /qr endpoint to get QR code');
+            this.lastQR = qr;
             qrcode.generate(qr, { small: true });
         });
 

@@ -73,6 +73,21 @@ const server = http.createServer((req, res) => {
     } else if (req.url === '/wake') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ message: 'Bot is awake!', timestamp: new Date().toISOString() }));
+    } else if (req.url === '/qr') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        if (bot && bot.whatsappBot && bot.whatsappBot.lastQR) {
+            res.end(`QR Code:\n${bot.whatsappBot.lastQR}`);
+        } else {
+            res.end('No QR code available yet. Check logs or try restarting the service.');
+        }
+    } else if (req.url === '/status') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            whatsappReady: bot ? bot.whatsappBot.isReady : false,
+            hasQR: bot ? !!bot.whatsappBot.lastQR : false,
+            uptime: process.uptime(),
+            timestamp: new Date().toISOString()
+        }));
     } else {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`

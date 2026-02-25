@@ -18,7 +18,8 @@
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
     "qrcode-terminal": "^0.12.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "puppeteer": "^21.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
