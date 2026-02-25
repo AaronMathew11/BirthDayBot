@@ -7,7 +7,7 @@ class WhatsAppBot {
         this.client = new Client({
             authStrategy: new LocalAuth(),
             puppeteer: {
-                executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser',
+                executablePath: process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -16,7 +16,9 @@ class WhatsAppBot {
                     '--no-first-run',
                     '--no-zygote',
                     '--single-process',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
                 ]
             }
         });

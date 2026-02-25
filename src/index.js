@@ -60,16 +60,52 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-// Simple HTTP server for Railway health checks
+// HTTP server with keep-alive for Render
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+        res.end(JSON.stringify({ 
+            status: 'ok', 
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            whatsappReady: bot ? bot.whatsappBot.isReady : false
+        }));
+    } else if (req.url === '/wake') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ message: 'Bot is awake!', timestamp: new Date().toISOString() }));
     } else {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Birthday Reminder Bot is running!');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`
+            <html>
+                <body>
+                    <h1>Birthday Reminder Bot</h1>
+                    <p>Status: Running ✅</p>
+                    <p>Time: ${new Date().toISOString()}</p>
+                    <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
+                    <a href="/health">Health Check</a>
+                </body>
+            </html>
+        `);
     }
 });
+
+// Self-ping to prevent Render from sleeping (ping every 14 minutes)
+if (process.env.NODE_ENV === 'production' && process.env.RENDER) {
+    const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+    if (RENDER_URL) {
+        setInterval(() => {
+            const https = require('https');
+            const http = require('http');
+            const client = RENDER_URL.startsWith('https') ? https : http;
+            
+            client.get(`${RENDER_URL}/wake`, (res) => {
+                console.log(`Keep-alive ping: ${res.statusCode}`);
+            }).on('error', (err) => {
+                console.log('Keep-alive ping failed:', err.message);
+            });
+        }, 14 * 60 * 1000); // 14 minutes
+    }
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
