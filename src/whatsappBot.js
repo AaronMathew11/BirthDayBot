@@ -1,5 +1,6 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const https = require('https');
 const BirthdayManager = require('./birthdayManager');
 
 class WhatsAppBot {
@@ -202,6 +203,92 @@ class WhatsAppBot {
             console.error('Error sending message:', error);
             return false;
         }
+    }
+
+    async sendBirthdayReminder(people) {
+        if (!this.isReady || !this.groupId) {
+            console.log('Bot not ready or group not set');
+            return false;
+        }
+
+        try {
+            // Send main message first
+            const message = this.birthdayManager.formatBirthdayMessage(people);
+            await this.client.sendMessage(this.groupId, message);
+
+            // Send photos for each person (if available)
+            for (const person of people) {
+                if (person.photo && person.photo !== 'N/A') {
+                    try {
+                        const media = await this.downloadPhoto(person.photo);
+                        if (media) {
+                            await this.client.sendMessage(this.groupId, media, {
+                                caption: `🎂 ${person.name}'s photo`
+                            });
+                        }
+                    } catch (photoError) {
+                        console.log(`Failed to send photo for ${person.name}:`, photoError.message);
+                    }
+                }
+            }
+
+            console.log('Birthday reminder with photos sent successfully');
+            return true;
+        } catch (error) {
+            console.error('Error sending birthday reminder:', error);
+            return false;
+        }
+    }
+
+    async downloadPhoto(photoUrl) {
+        return new Promise((resolve) => {
+            try {
+                // Convert Google Drive sharing URL to direct download URL
+                const directUrl = this.convertGoogleDriveUrl(photoUrl);
+                
+                https.get(directUrl, (response) => {
+                    if (response.statusCode !== 200) {
+                        console.log(`Photo download failed: ${response.statusCode}`);
+                        resolve(null);
+                        return;
+                    }
+
+                    const chunks = [];
+                    response.on('data', (chunk) => chunks.push(chunk));
+                    response.on('end', () => {
+                        try {
+                            const buffer = Buffer.concat(chunks);
+                            const contentType = response.headers['content-type'] || 'image/jpeg';
+                            const media = new MessageMedia(contentType, buffer.toString('base64'));
+                            resolve(media);
+                        } catch (error) {
+                            console.log('Error creating media:', error.message);
+                            resolve(null);
+                        }
+                    });
+                }).on('error', (error) => {
+                    console.log('Photo download error:', error.message);
+                    resolve(null);
+                });
+            } catch (error) {
+                console.log('Photo URL conversion error:', error.message);
+                resolve(null);
+            }
+        });
+    }
+
+    convertGoogleDriveUrl(url) {
+        // Convert Google Drive sharing URL to direct download
+        // From: https://drive.google.com/open?id=FILE_ID
+        // To: https://drive.google.com/uc?export=download&id=FILE_ID
+        
+        if (url.includes('drive.google.com')) {
+            const fileIdMatch = url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (fileIdMatch) {
+                return `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+            }
+        }
+        return url; // Return original if not Google Drive or can't parse
     }
 
     async getGroups() {

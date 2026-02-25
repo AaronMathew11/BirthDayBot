@@ -25,6 +25,7 @@ class CSVConverter {
                 const fullName = values[2]?.trim();
                 const dob = values[3]?.trim();
                 const phoneNumber = values[6]?.trim();
+                const photoUrl = values[7]?.trim();
                 
                 if (fullName && dob && this.isValidDate(dob)) {
                     const birthday = this.formatBirthday(dob);
@@ -32,7 +33,8 @@ class CSVConverter {
                         birthdays.push({
                             name: fullName,
                             birthday: birthday,
-                            phone: phoneNumber || 'N/A'
+                            phone: phoneNumber || 'N/A',
+                            photo: photoUrl || null
                         });
                     }
                 }

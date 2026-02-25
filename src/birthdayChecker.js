@@ -14,12 +14,12 @@ class BirthdayChecker {
             const tomorrowsBirthdays = this.birthdayManager.getTomorrowsBirthdays(birthdays);
             
             if (tomorrowsBirthdays.length > 0) {
-                const message = this.birthdayManager.formatBirthdayMessage(tomorrowsBirthdays);
                 console.log(`Found ${tomorrowsBirthdays.length} birthday(s) tomorrow`);
                 
-                const success = await this.whatsappBot.sendMessage(message);
+                // Use the new sendBirthdayReminder method that includes photos
+                const success = await this.whatsappBot.sendBirthdayReminder(tomorrowsBirthdays);
                 if (success) {
-                    console.log('Birthday reminder sent successfully');
+                    console.log('Birthday reminder with photos sent successfully');
                 } else {
                     console.log('Failed to send birthday reminder');
                 }
