@@ -1,0 +1,26 @@
+{
+  "name": "birthday-reminder-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for birthday reminders",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "railway:build": "npm install",
+    "railway:start": "npm start"
+  },
+  "keywords": ["whatsapp", "bot", "birthday", "reminder", "railway"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
