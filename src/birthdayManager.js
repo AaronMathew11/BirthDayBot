@@ -121,7 +121,7 @@ class BirthdayManager {
             message += `   📆 ${person.date}${dayIndicator}\n\n`;
         });
         
-        message += 'Don\'t forget to celebrate! 🎈';
+        message += 'Don\'t forget to have the posters posted out by tomorrow 10 AM!';
         return message;
     }
 }

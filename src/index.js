@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const http = require('http');
+const QRCode = require('qrcode');
 const WhatsAppBot = require('./whatsappBot');
 const BirthdayChecker = require('./birthdayChecker');
 
@@ -74,11 +75,42 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ message: 'Bot is awake!', timestamp: new Date().toISOString() }));
     } else if (req.url === '/qr') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
         if (bot && bot.whatsappBot && bot.whatsappBot.lastQR) {
-            res.end(`QR Code:\n${bot.whatsappBot.lastQR}`);
+            try {
+                QRCode.toDataURL(bot.whatsappBot.lastQR, (err, url) => {
+                    if (err) {
+                        res.writeHead(200, { 'Content-Type': 'text/plain' });
+                        res.end(`QR Code Error: ${err.message}`);
+                    } else {
+                        res.writeHead(200, { 'Content-Type': 'text/html' });
+                        res.end(`
+                            <html>
+                                <body style="text-align: center; padding: 20px;">
+                                    <h1>WhatsApp QR Code</h1>
+                                    <p>Scan this QR code with WhatsApp:</p>
+                                    <img src="${url}" alt="WhatsApp QR Code" style="max-width: 400px;">
+                                    <p>The QR code will disappear once you scan it successfully.</p>
+                                </body>
+                            </html>
+                        `);
+                    }
+                });
+            } catch (error) {
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.end(`QR Code Generation Error: ${error.message}`);
+            }
         } else {
-            res.end('No QR code available yet. Check logs or try restarting the service.');
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(`
+                <html>
+                    <body style="text-align: center; padding: 20px;">
+                        <h1>WhatsApp QR Code</h1>
+                        <p>No QR code available yet.</p>
+                        <p>Please wait for the bot to generate a new QR code or try refreshing.</p>
+                        <a href="/qr">Refresh</a>
+                    </body>
+                </html>
+            `);
         }
     } else if (req.url === '/status') {
         res.writeHead(200, { 'Content-Type': 'application/json' });

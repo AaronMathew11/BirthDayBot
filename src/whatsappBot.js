@@ -5,30 +5,8 @@ const BirthdayManager = require('./birthdayManager');
 
 class WhatsAppBot {
     constructor() {
-        // Render-specific Chrome configuration
-        const puppeteerConfig = {
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
-        };
-
-        // Only set executablePath if we have a custom one
-        if (process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH) {
-            puppeteerConfig.executablePath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
-        }
-
         this.client = new Client({
-            authStrategy: new LocalAuth(),
-            puppeteer: puppeteerConfig
+            authStrategy: new LocalAuth()
         });
         this.isReady = false;
         this.groupId = null;
