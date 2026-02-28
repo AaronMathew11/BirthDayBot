@@ -1,33 +1,28 @@
 {
-  "name": "birthday-reminder-bot",
+  "name": "telegram-birthday-bot",
   "version": "1.0.0",
-  "description": "WhatsApp bot for birthday reminders",
-  "main": "src/index.js",
+  "description": "Telegram Birthday Reminder Bot - Clean and Simple",
+  "main": "api/index.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "postinstall": "node scripts/install-chrome.js",
-    "gcp:deploy": "gcloud app deploy",
-    "railway:build": "npm install",
-    "railway:start": "npm start"
+    "start": "node src/telegramBirthdayApp.js",
+    "dev": "nodemon src/telegramBirthdayApp.js"
   },
   "keywords": [
-    "whatsapp",
+    "telegram",
     "bot",
     "birthday",
-    "reminder",
-    "railway"
+    "reminder"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
     "node-cron": "^3.0.3",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.23.0"
+    "node-telegram-bot-api": "^0.64.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
