@@ -5,11 +5,14 @@ const BirthdayManager = require('./birthdayManager');
 
 class WhatsAppBot {
     constructor() {
+        const isLowMemory = process.env.GAE_INSTANCE_CLASS === 'F1' || process.env.LOW_MEMORY === 'true';
+        
         this.client = new Client({
             authStrategy: new LocalAuth(),
             puppeteer: {
                 headless: true,
-                args: [
+                args: isLowMemory ? [
+                    // Optimized for E2 micro/low memory instances
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
@@ -19,8 +22,44 @@ class WhatsAppBot {
                     '--single-process',
                     '--disable-gpu',
                     '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
+                    '--disable-features=VizDisplayCompositor',
+                    '--memory-pressure-off',
+                    '--max_old_space_size=512',
+                    '--disable-background-networking',
+                    '--disable-background-timer-throttling',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-default-apps',
+                    '--disable-hang-monitor',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--metrics-recording-only',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update',
+                    '--disable-extensions'
+                ] : [
+                    // Standard configuration for higher memory instances
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--disable-features=TranslateUI',
+                    '--disable-ipc-flooding-protection',
+                    '--memory-pressure-off',
+                    '--max_old_space_size=4096'
+                ],
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+                timeout: isLowMemory ? 120000 : 60000
             }
         });
         this.isReady = false;
@@ -121,6 +160,9 @@ class WhatsAppBot {
         else if (messageBody === '!nextweek' && isGroup && this.groupId === message.from) {
             await this.handleNextWeekCommand(message);
         }
+        else if (messageBody === '!prevmonth' && isGroup && this.groupId === message.from) {
+            await this.handlePreviousMonthCommand(message);
+        }
         else if (messageBody === '!help' && isGroup && this.groupId === message.from) {
             await this.handleHelpCommand(message);
         }
@@ -155,12 +197,32 @@ class WhatsAppBot {
         }
     }
 
+    async handlePreviousMonthCommand(message) {
+        try {
+            const birthdays = await this.birthdayManager.loadBirthdays();
+            const previousMonthBirthdays = this.birthdayManager.getPreviousMonthsBirthdays(birthdays);
+            
+            // Get previous month name
+            const today = new Date();
+            const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const monthName = previousMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            const responseMessage = this.birthdayManager.formatMonthlyBirthdayMessage(previousMonthBirthdays, `Previous Month's Birthdays (${monthName})`);
+            await message.reply(responseMessage);
+            console.log('Previous month command executed successfully');
+        } catch (error) {
+            console.error('Error handling prevmonth command:', error);
+            await message.reply('❌ Sorry, I couldn\'t retrieve previous month\'s birthdays. Please try again later.');
+        }
+    }
+
     async handleHelpCommand(message) {
         const helpMessage = `🤖 *Birthday Bot Commands* 🤖\n\n` +
                           `📋 Available commands:\n\n` +
                           `• *!setgroup* - Set this group for birthday reminders\n` +
                           `• *!thisweek* - Show birthdays coming up this week\n` +
                           `• *!nextweek* - Show birthdays coming up next week\n` +
+                          `• *!prevmonth* - Show birthdays from previous month\n` +
                           `• *!help* or *!commands* - Show this help message\n\n` +
                           `🎂 The bot automatically sends reminders one day before each birthday at 9:00 AM!`;
         

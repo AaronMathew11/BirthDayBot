@@ -93,6 +93,35 @@ class BirthdayManager {
         return nextWeekBirthdays.sort((a, b) => a.daysFromToday - b.daysFromToday);
     }
 
+    getPreviousMonthsBirthdays(birthdays) {
+        const today = new Date();
+        const previousMonthBirthdays = [];
+        
+        // Get the previous month
+        const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const previousMonthNumber = String(previousMonth.getMonth() + 1).padStart(2, '0');
+        
+        // Get all days in the previous month
+        const daysInPrevMonth = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0).getDate();
+        
+        for (let day = 1; day <= daysInPrevMonth; day++) {
+            const dayStr = String(day).padStart(2, '0');
+            const dateStr = `${previousMonthNumber}-${dayStr}`;
+            
+            const dayBirthdays = birthdays.filter(person => person.birthday === dateStr);
+            dayBirthdays.forEach(person => {
+                const birthdayDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), day);
+                previousMonthBirthdays.push({
+                    ...person,
+                    date: birthdayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                    actualDate: birthdayDate
+                });
+            });
+        }
+        
+        return previousMonthBirthdays.sort((a, b) => a.actualDate - b.actualDate);
+    }
+
     formatBirthdayMessage(people) {
         if (people.length === 0) return null;
         
@@ -122,6 +151,22 @@ class BirthdayManager {
         });
         
         message += 'Don\'t forget to have the posters posted out by tomorrow 10 AM!';
+        return message;
+    }
+
+    formatMonthlyBirthdayMessage(people, monthTitle) {
+        if (people.length === 0) {
+            return `📅 *${monthTitle}*\n\nNo birthdays in ${monthTitle.toLowerCase()} 🎈`;
+        }
+        
+        let message = `📅 *${monthTitle}*\n\n`;
+        
+        people.forEach(person => {
+            message += `🎂 *${person.name}*\n`;
+            message += `   📆 ${person.date}\n\n`;
+        });
+        
+        message += `Total: ${people.length} birthday${people.length === 1 ? '' : 's'} in ${monthTitle.toLowerCase()}`;
         return message;
     }
 }

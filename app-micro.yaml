@@ -1,0 +1,32 @@
+runtime: nodejs20
+
+env_variables:
+  NODE_ENV: production
+  PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+  PUPPETEER_EXECUTABLE_PATH: "/usr/bin/google-chrome-stable"
+
+instance_class: F1
+automatic_scaling:
+  min_instances: 1
+  max_instances: 1
+
+# Optimized for E2 micro limitations
+resources:
+  cpu: 1
+  memory_gb: 1
+
+# Extended timeouts for slow instance
+readiness_check:
+  path: "/health"
+  check_interval_sec: 30
+  timeout_sec: 20
+  failure_threshold: 5
+  success_threshold: 1
+  app_start_timeout_sec: 900
+
+liveness_check:
+  path: "/health"
+  check_interval_sec: 120
+  timeout_sec: 20
+  failure_threshold: 5
+  success_threshold: 1

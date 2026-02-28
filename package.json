@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "postinstall": "node scripts/install-chrome.js",
+    "gcp:deploy": "gcloud app deploy",
     "railway:build": "npm install",
     "railway:start": "npm start"
   },
