@@ -1,23 +1,5 @@
 {
   "version": 2,
-  "name": "telegram-birthday-bot",
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "api/index.js"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "TELEGRAM_BOT_TOKEN": "@telegram_bot_token",
-    "BOT_USERNAME": "@bot_username"
-  },
   "functions": {
     "api/index.js": {
       "maxDuration": 30
