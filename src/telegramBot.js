@@ -9,14 +9,23 @@ class TelegramBirthdayBot {
             throw new Error('TELEGRAM_BOT_TOKEN is required. Get it from @BotFather on Telegram');
         }
 
-        this.bot = new TelegramBot(this.token, { 
-            polling: true,
-            request: {
-                agentOptions: {
-                    rejectUnauthorized: false
+        // Use webhook in production, polling in development
+        const useWebhook = process.env.VERCEL || process.env.NODE_ENV === 'production';
+        
+        if (useWebhook) {
+            this.bot = new TelegramBot(this.token, { 
+                webHook: false // We'll set this up manually
+            });
+        } else {
+            this.bot = new TelegramBot(this.token, { 
+                polling: true,
+                request: {
+                    agentOptions: {
+                        rejectUnauthorized: false
+                    }
                 }
-            }
-        });
+            });
+        }
         this.birthdayManager = new BirthdayManager();
         this.authorizedChats = new Set(); // Store authorized group/chat IDs
         
