@@ -4,7 +4,13 @@ const fs = require('fs').promises;
 
 // Initialize components
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token);
+let bot;
+try {
+    bot = token ? new TelegramBot(token) : null;
+} catch (error) {
+    console.error('Bot initialization error:', error);
+    bot = null;
+}
 const authorizedChats = new Set();
 
 // Birthday Manager functionality
@@ -185,11 +191,11 @@ Let's get started! 🚀
                 }
             };
 
-            await bot.sendMessage(chatId, welcomeMessage, options);
+            if (bot) await bot.sendMessage(chatId, welcomeMessage, options);
         }
         else if (text === '/setgroup' && isGroup) {
             authorizedChats.add(chatId);
-            await bot.sendMessage(chatId, 
+            if (bot) await bot.sendMessage(chatId, 
                 '✅ *Group Set Successfully!*\n\n' +
                 'This group has been set for birthday reminders.\n\n' +
                 '*What happens next:*\n' +
@@ -208,13 +214,13 @@ Let's get started! 🚀
             const birthdays = await loadBirthdays();
             const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
             const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
-            await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
+            if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/nextweek') {
             const birthdays = await loadBirthdays();
             const nextWeekBirthdays = getNextWeeksBirthdays(birthdays);
             const responseMessage = formatWeeklyMessage(nextWeekBirthdays, 'Next Week\'s Birthdays');
-            await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
+            if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/prevmonth') {
             const birthdays = await loadBirthdays();
@@ -225,7 +231,7 @@ Let's get started! 🚀
             const monthName = previousMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             
             const responseMessage = formatMonthlyMessage(prevMonthBirthdays, `Previous Month's Birthdays (${monthName})`);
-            await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
+            if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/help') {
             const helpMessage = `
@@ -252,7 +258,7 @@ Let's get started! 🚀
 
 *Need help?* Contact the bot administrator.
             `;
-            await bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+            if (bot) await bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/status') {
             const statusMessage = `
@@ -270,7 +276,7 @@ Let's get started! 🚀
 
 Everything looks good! 🎉
             `;
-            await bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
+            if (bot) await bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
         }
 
         // Handle callback queries
@@ -279,13 +285,13 @@ Everything looks good! 🎉
             const action = callbackQuery.data;
             const msgChatId = callbackQuery.message.chat.id;
 
-            await bot.answerCallbackQuery(callbackQuery.id);
+            if (bot) await bot.answerCallbackQuery(callbackQuery.id);
 
             if (action === 'thisweek') {
                 const birthdays = await loadBirthdays();
                 const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
                 const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
-                await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
+                if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
             }
             // Add other callback handlers...
         }
@@ -302,6 +308,9 @@ module.exports = async (req, res) => {
         
         // Handle webhook
         if (req.method === 'POST' && req.url === '/') {
+            if (!bot) {
+                return res.status(500).json({ error: 'Bot not initialized' });
+            }
             await processUpdate(req.body);
             return res.status(200).json({ ok: true });
         }
@@ -318,6 +327,9 @@ module.exports = async (req, res) => {
         
         // Set webhook
         if (req.url === '/setup-webhook') {
+            if (!bot) {
+                return res.status(500).json({ error: 'Bot not initialized' });
+            }
             const webhookUrl = `https://${req.headers.host}/`;
             await bot.setWebHook(webhookUrl);
             return res.status(200).json({ 
