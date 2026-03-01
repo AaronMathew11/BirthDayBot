@@ -304,7 +304,7 @@ Everything looks good! 🎉
 // Vercel serverless function handler
 module.exports = async (req, res) => {
     try {
-        console.log(`📡 ${req.method} ${req.url}`);
+        console.log(`📡 ${req.method} ${req.url}`, 'Headers:', req.headers.host);
         
         // Handle webhook
         if (req.method === 'POST' && req.url === '/') {
@@ -316,7 +316,7 @@ module.exports = async (req, res) => {
         }
         
         // Health check
-        if (req.url === '/health') {
+        if (req.url === '/health' || req.url === '/api/health') {
             return res.status(200).json({
                 status: 'ok',
                 service: 'Telegram Birthday Bot',
@@ -326,7 +326,7 @@ module.exports = async (req, res) => {
         }
         
         // Set webhook
-        if (req.url === '/setup-webhook') {
+        if (req.url === '/setup-webhook' || req.url === '/api/setup-webhook') {
             if (!bot) {
                 return res.status(500).json({ error: 'Bot not initialized' });
             }
