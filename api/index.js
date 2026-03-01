@@ -13,16 +13,91 @@ try {
 }
 const authorizedChats = new Set();
 
-// Birthday Manager functionality
+// Birthday and Anniversary Manager functionality
 async function loadBirthdays() {
     try {
         const birthdaysFile = path.join(process.cwd(), 'data', 'birthdays.json');
         const data = await fs.readFile(birthdaysFile, 'utf8');
-        return JSON.parse(data);
+        const birthdays = JSON.parse(data);
+        
+        // Also load anniversaries from CSV directly
+        const csvFile = path.join(process.cwd(), 'NFC South - Tech_Media Team Data - memberInfo.csv');
+        const csvData = await fs.readFile(csvFile, 'utf8');
+        const anniversaries = parseAnniversariesFromCSV(csvData);
+        
+        // Combine birthdays and anniversaries
+        return [...birthdays, ...anniversaries];
     } catch (error) {
-        console.error('Error loading birthdays:', error);
-        return [];
+        console.error('Error loading birthdays and anniversaries:', error);
+        // Fallback to just birthdays if CSV parsing fails
+        try {
+            const birthdaysFile = path.join(process.cwd(), 'data', 'birthdays.json');
+            const data = await fs.readFile(birthdaysFile, 'utf8');
+            return JSON.parse(data);
+        } catch (fallbackError) {
+            console.error('Error loading fallback birthdays:', fallbackError);
+            return [];
+        }
     }
+}
+
+function parseAnniversariesFromCSV(csvData) {
+    const lines = csvData.split('\n');
+    const anniversaries = [];
+    
+    // Skip header line
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Parse CSV line (handle quoted fields)
+        const fields = parseCSVLine(line);
+        if (fields.length < 5) continue;
+        
+        const fullName = fields[2]?.trim();
+        const anniversaryDate = fields[4]?.trim();
+        
+        if (fullName && anniversaryDate && anniversaryDate !== '') {
+            // Convert anniversary date from MM/DD/YYYY or M/D/YYYY to MM-DD format
+            const dateParts = anniversaryDate.split('/');
+            if (dateParts.length >= 2) {
+                const month = String(parseInt(dateParts[0])).padStart(2, '0');
+                const day = String(parseInt(dateParts[1])).padStart(2, '0');
+                
+                anniversaries.push({
+                    name: fullName,
+                    birthday: `${month}-${day}`, // Using same field for consistency
+                    type: 'anniversary',
+                    phone: fields[5]?.trim() || '',
+                    photo: fields[7]?.trim() || ''
+                });
+            }
+        }
+    }
+    
+    return anniversaries;
+}
+
+function parseCSVLine(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            fields.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    fields.push(current); // Add the last field
+    return fields;
 }
 
 function getThisWeeksBirthdays(birthdays) {
@@ -41,6 +116,7 @@ function getThisWeeksBirthdays(birthdays) {
         dayBirthdays.forEach(person => {
             thisWeekBirthdays.push({
                 ...person,
+                type: person.type || 'birthday', // Default to birthday if type not specified
                 date: checkDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
                 daysFromToday: i
             });
@@ -66,6 +142,7 @@ function getNextWeeksBirthdays(birthdays) {
         dayBirthdays.forEach(person => {
             nextWeekBirthdays.push({
                 ...person,
+                type: person.type || 'birthday',
                 date: checkDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
                 daysFromToday: i
             });
@@ -93,6 +170,7 @@ function getPreviousMonthsBirthdays(birthdays) {
             const birthdayDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), day);
             previousMonthBirthdays.push({
                 ...person,
+                type: person.type || 'birthday',
                 date: birthdayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
                 actualDate: birthdayDate
             });
@@ -122,6 +200,7 @@ function getThisMonthsBirthdays(birthdays) {
             
             thisMonthBirthdays.push({
                 ...person,
+                type: person.type || 'birthday',
                 date: birthdayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
                 actualDate: birthdayDate,
                 daysFromToday: daysFromToday
@@ -143,7 +222,10 @@ function formatWeeklyMessage(birthdays, title) {
     birthdays.forEach(person => {
         const dayIndicator = person.daysFromToday === 0 ? ' (Today!)' : 
                            person.daysFromToday === 1 ? ' (Tomorrow!)' : '';
-        message += `🎂 *${person.name}*\n`;
+        const icon = person.type === 'anniversary' ? '💍' : '🎂';
+        const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+        
+        message += `${icon} *${person.name}* (${eventType})\n`;
         message += `   📆 ${person.date}${dayIndicator}\n\n`;
     });
     
@@ -159,11 +241,22 @@ function formatMonthlyMessage(birthdays, title) {
     let message = `📅 *${title}*\n\n`;
     
     birthdays.forEach(person => {
-        message += `🎂 *${person.name}*\n`;
+        const icon = person.type === 'anniversary' ? '💍' : '🎂';
+        const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+        
+        message += `${icon} *${person.name}* (${eventType})\n`;
         message += `   📆 ${person.date}\n\n`;
     });
     
-    message += `Total: ${birthdays.length} birthday${birthdays.length === 1 ? '' : 's'}`;
+    const birthdayCount = birthdays.filter(p => p.type !== 'anniversary').length;
+    const anniversaryCount = birthdays.filter(p => p.type === 'anniversary').length;
+    
+    let summary = 'Total: ';
+    const parts = [];
+    if (birthdayCount > 0) parts.push(`${birthdayCount} birthday${birthdayCount === 1 ? '' : 's'}`);
+    if (anniversaryCount > 0) parts.push(`${anniversaryCount} anniversar${anniversaryCount === 1 ? 'y' : 'ies'}`);
+    
+    message += summary + parts.join(', ');
     return message;
 }
 
@@ -183,16 +276,16 @@ async function processUpdate(update) {
         
         if (text === '/start') {
             const welcomeMessage = `
-🎂 *Welcome to Birthday Reminder Bot!*
+🎂 *Welcome to Birthday & Anniversary Reminder Bot!*
 
-I'll help you manage and remind about birthdays in your group.
+I'll help you manage and remind about birthdays and anniversaries in your group.
 
 *Available Commands:*
-• /setgroup - Set this group for birthday reminders
-• /thisweek - Show this week's birthdays
-• /nextweek - Show next week's birthdays
-• /thismonth - Show this month's birthdays
-• /prevmonth - Show previous month's birthdays
+• /setgroup - Set this group for birthday & anniversary reminders
+• /thisweek - Show this week's birthdays & anniversaries
+• /nextweek - Show next week's birthdays & anniversaries
+• /thismonth - Show this month's birthdays & anniversaries
+• /prevmonth - Show previous month's birthdays & anniversaries
 • /help - Show this help message
 • /status - Check bot status
 
@@ -229,15 +322,16 @@ Let's get started! 🚀
             authorizedChats.add(chatId);
             if (bot) await bot.sendMessage(chatId, 
                 '✅ *Group Set Successfully!*\n\n' +
-                'This group has been set for birthday reminders.\n\n' +
+                'This group has been set for birthday and anniversary reminders.\n\n' +
                 '*What happens next:*\n' +
-                '• I\'ll check for birthdays daily at 9:00 AM\n' +
-                '• Birthday reminders will be sent here\n' +
-                '• You can use all birthday commands in this group\n\n' +
+                '• I\'ll check for birthdays and anniversaries daily at 9:00 AM\n' +
+                '• Birthday and anniversary reminders will be sent here\n' +
+                '• You can use all birthday and anniversary commands in this group\n\n' +
                 '*Test it now:*\n' +
-                '• /thisweek - See this week\'s birthdays\n' +
-                '• /nextweek - See next week\'s birthdays\n' +
-                '• /prevmonth - See last month\'s birthdays\n\n' +
+                '• /thisweek - See this week\'s birthdays & anniversaries\n' +
+                '• /nextweek - See next week\'s birthdays & anniversaries\n' +
+                '• /thismonth - See this month\'s birthdays & anniversaries\n' +
+                '• /prevmonth - See last month\'s birthdays & anniversaries\n\n' +
                 'All set! 🎉', 
                 { parse_mode: 'Markdown' }
             );
@@ -277,19 +371,19 @@ Let's get started! 🚀
         }
         else if (text === '/help') {
             const helpMessage = `
-🤖 *Birthday Bot Help*
+🤖 *Birthday & Anniversary Bot Help*
 
 *Commands:*
 • /start - Show welcome message
 • /setgroup - Authorize this group for reminders
-• /thisweek - Show birthdays this week
-• /nextweek - Show birthdays next week
-• /thismonth - Show birthdays this month
-• /prevmonth - Show last month's birthdays
+• /thisweek - Show birthdays & anniversaries this week
+• /nextweek - Show birthdays & anniversaries next week
+• /thismonth - Show birthdays & anniversaries this month
+• /prevmonth - Show last month's birthdays & anniversaries
 • /status - Check bot health
 
 *Features:*
-✅ Automatic daily reminders at 9:00 AM
+✅ Automatic daily reminders at 9:00 AM for birthdays & anniversaries
 ✅ Weekly and monthly summaries
 ✅ Works in groups and private chats
 ✅ No setup required - just add to group!
@@ -361,19 +455,19 @@ Everything looks good! 🎉
             }
             else if (action === 'help') {
                 const helpMessage = `
-🤖 *Birthday Bot Help*
+🤖 *Birthday & Anniversary Bot Help*
 
 *Commands:*
 • /start - Show welcome message
 • /setgroup - Authorize this group for reminders
-• /thisweek - Show birthdays this week
-• /nextweek - Show birthdays next week
-• /thismonth - Show birthdays this month
-• /prevmonth - Show last month's birthdays
+• /thisweek - Show birthdays & anniversaries this week
+• /nextweek - Show birthdays & anniversaries next week
+• /thismonth - Show birthdays & anniversaries this month
+• /prevmonth - Show last month's birthdays & anniversaries
 • /status - Check bot health
 
 *Features:*
-✅ Automatic daily reminders at 9:00 AM
+✅ Automatic daily reminders at 9:00 AM for birthdays & anniversaries
 ✅ Weekly and monthly summaries
 ✅ Works in groups and private chats
 ✅ No setup required - just add to group!
