@@ -1,12 +1,100 @@
-require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const BirthdayManager = require('../src/birthdayManager');
+const path = require('path');
+const fs = require('fs').promises;
 
 // Initialize components
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token);
-const birthdayManager = new BirthdayManager();
 const authorizedChats = new Set();
+
+// Birthday Manager functionality
+async function loadBirthdays() {
+    try {
+        const birthdaysFile = path.join(process.cwd(), 'data', 'birthdays.json');
+        const data = await fs.readFile(birthdaysFile, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading birthdays:', error);
+        return [];
+    }
+}
+
+function getThisWeeksBirthdays(birthdays) {
+    const today = new Date();
+    const thisWeekBirthdays = [];
+    
+    for (let i = 0; i < 7; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + i);
+        
+        const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+        const day = String(checkDate.getDate()).padStart(2, '0');
+        const dateStr = `${month}-${day}`;
+        
+        const dayBirthdays = birthdays.filter(person => person.birthday === dateStr);
+        dayBirthdays.forEach(person => {
+            thisWeekBirthdays.push({
+                ...person,
+                date: checkDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                daysFromToday: i
+            });
+        });
+    }
+    
+    return thisWeekBirthdays.sort((a, b) => a.daysFromToday - b.daysFromToday);
+}
+
+function getNextWeeksBirthdays(birthdays) {
+    const today = new Date();
+    const nextWeekBirthdays = [];
+    
+    for (let i = 7; i < 14; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + i);
+        
+        const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+        const day = String(checkDate.getDate()).padStart(2, '0');
+        const dateStr = `${month}-${day}`;
+        
+        const dayBirthdays = birthdays.filter(person => person.birthday === dateStr);
+        dayBirthdays.forEach(person => {
+            nextWeekBirthdays.push({
+                ...person,
+                date: checkDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                daysFromToday: i
+            });
+        });
+    }
+    
+    return nextWeekBirthdays.sort((a, b) => a.daysFromToday - b.daysFromToday);
+}
+
+function getPreviousMonthsBirthdays(birthdays) {
+    const today = new Date();
+    const previousMonthBirthdays = [];
+    
+    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const previousMonthNumber = String(previousMonth.getMonth() + 1).padStart(2, '0');
+    
+    const daysInPrevMonth = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0).getDate();
+    
+    for (let day = 1; day <= daysInPrevMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dateStr = `${previousMonthNumber}-${dayStr}`;
+        
+        const dayBirthdays = birthdays.filter(person => person.birthday === dateStr);
+        dayBirthdays.forEach(person => {
+            const birthdayDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), day);
+            previousMonthBirthdays.push({
+                ...person,
+                date: birthdayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                actualDate: birthdayDate
+            });
+        });
+    }
+    
+    return previousMonthBirthdays.sort((a, b) => a.actualDate - b.actualDate);
+}
 
 // Helper functions for message formatting
 function formatWeeklyMessage(birthdays, title) {
@@ -117,20 +205,20 @@ Let's get started! 🚀
             );
         }
         else if (text === '/thisweek') {
-            const birthdays = await birthdayManager.loadBirthdays();
-            const thisWeekBirthdays = birthdayManager.getThisWeeksBirthdays(birthdays);
+            const birthdays = await loadBirthdays();
+            const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
             const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
             await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/nextweek') {
-            const birthdays = await birthdayManager.loadBirthdays();
-            const nextWeekBirthdays = birthdayManager.getNextWeeksBirthdays(birthdays);
+            const birthdays = await loadBirthdays();
+            const nextWeekBirthdays = getNextWeeksBirthdays(birthdays);
             const responseMessage = formatWeeklyMessage(nextWeekBirthdays, 'Next Week\'s Birthdays');
             await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
         else if (text === '/prevmonth') {
-            const birthdays = await birthdayManager.loadBirthdays();
-            const prevMonthBirthdays = birthdayManager.getPreviousMonthsBirthdays(birthdays);
+            const birthdays = await loadBirthdays();
+            const prevMonthBirthdays = getPreviousMonthsBirthdays(birthdays);
             
             const today = new Date();
             const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -194,8 +282,8 @@ Everything looks good! 🎉
             await bot.answerCallbackQuery(callbackQuery.id);
 
             if (action === 'thisweek') {
-                const birthdays = await birthdayManager.loadBirthdays();
-                const thisWeekBirthdays = birthdayManager.getThisWeeksBirthdays(birthdays);
+                const birthdays = await loadBirthdays();
+                const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
                 const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
                 await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
             }
