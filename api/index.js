@@ -102,6 +102,36 @@ function getPreviousMonthsBirthdays(birthdays) {
     return previousMonthBirthdays.sort((a, b) => a.actualDate - b.actualDate);
 }
 
+function getThisMonthsBirthdays(birthdays) {
+    const today = new Date();
+    const thisMonthBirthdays = [];
+    
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const thisMonthNumber = String(thisMonth.getMonth() + 1).padStart(2, '0');
+    
+    const daysInThisMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() + 1, 0).getDate();
+    
+    for (let day = 1; day <= daysInThisMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dateStr = `${thisMonthNumber}-${dayStr}`;
+        
+        const dayBirthdays = birthdays.filter(person => person.birthday === dateStr);
+        dayBirthdays.forEach(person => {
+            const birthdayDate = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), day);
+            const daysFromToday = Math.ceil((birthdayDate - today) / (1000 * 60 * 60 * 24));
+            
+            thisMonthBirthdays.push({
+                ...person,
+                date: birthdayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                actualDate: birthdayDate,
+                daysFromToday: daysFromToday
+            });
+        });
+    }
+    
+    return thisMonthBirthdays.sort((a, b) => a.actualDate - b.actualDate);
+}
+
 // Helper functions for message formatting
 function formatWeeklyMessage(birthdays, title) {
     if (birthdays.length === 0) {
@@ -160,7 +190,8 @@ I'll help you manage and remind about birthdays in your group.
 *Available Commands:*
 • /setgroup - Set this group for birthday reminders
 • /thisweek - Show this week's birthdays
-• /nextweek - Show next week's birthdays  
+• /nextweek - Show next week's birthdays
+• /thismonth - Show this month's birthdays
 • /prevmonth - Show previous month's birthdays
 • /help - Show this help message
 • /status - Check bot status
@@ -182,6 +213,7 @@ Let's get started! 🚀
                             { text: '🗓️ Next Week', callback_data: 'nextweek' }
                         ],
                         [
+                            { text: '🗓️ This Month', callback_data: 'thismonth' },
                             { text: '📋 Previous Month', callback_data: 'prevmonth' }
                         ],
                         [
@@ -222,6 +254,16 @@ Let's get started! 🚀
             const responseMessage = formatWeeklyMessage(nextWeekBirthdays, 'Next Week\'s Birthdays');
             if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
         }
+        else if (text === '/thismonth') {
+            const birthdays = await loadBirthdays();
+            const thisMonthBirthdays = getThisMonthsBirthdays(birthdays);
+            
+            const today = new Date();
+            const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            const responseMessage = formatMonthlyMessage(thisMonthBirthdays, `This Month's Birthdays (${monthName})`);
+            if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
+        }
         else if (text === '/prevmonth') {
             const birthdays = await loadBirthdays();
             const prevMonthBirthdays = getPreviousMonthsBirthdays(birthdays);
@@ -242,6 +284,7 @@ Let's get started! 🚀
 • /setgroup - Authorize this group for reminders
 • /thisweek - Show birthdays this week
 • /nextweek - Show birthdays next week
+• /thismonth - Show birthdays this month
 • /prevmonth - Show last month's birthdays
 • /status - Check bot health
 
@@ -293,7 +336,52 @@ Everything looks good! 🎉
                 const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
                 if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
             }
-            // Add other callback handlers...
+            else if (action === 'nextweek') {
+                const birthdays = await loadBirthdays();
+                const nextWeekBirthdays = getNextWeeksBirthdays(birthdays);
+                const responseMessage = formatWeeklyMessage(nextWeekBirthdays, 'Next Week\'s Birthdays');
+                if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
+            }
+            else if (action === 'thismonth') {
+                const birthdays = await loadBirthdays();
+                const thisMonthBirthdays = getThisMonthsBirthdays(birthdays);
+                const today = new Date();
+                const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const responseMessage = formatMonthlyMessage(thisMonthBirthdays, `This Month's Birthdays (${monthName})`);
+                if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
+            }
+            else if (action === 'prevmonth') {
+                const birthdays = await loadBirthdays();
+                const prevMonthBirthdays = getPreviousMonthsBirthdays(birthdays);
+                const today = new Date();
+                const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                const monthName = previousMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const responseMessage = formatMonthlyMessage(prevMonthBirthdays, `Previous Month's Birthdays (${monthName})`);
+                if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
+            }
+            else if (action === 'help') {
+                const helpMessage = `
+🤖 *Birthday Bot Help*
+
+*Commands:*
+• /start - Show welcome message
+• /setgroup - Authorize this group for reminders
+• /thisweek - Show birthdays this week
+• /nextweek - Show birthdays next week
+• /thismonth - Show birthdays this month
+• /prevmonth - Show last month's birthdays
+• /status - Check bot health
+
+*Features:*
+✅ Automatic daily reminders at 9:00 AM
+✅ Weekly and monthly summaries
+✅ Works in groups and private chats
+✅ No setup required - just add to group!
+
+*Need help?* Contact the bot administrator.
+                `;
+                if (bot) await bot.sendMessage(msgChatId, helpMessage, { parse_mode: 'Markdown' });
+            }
         }
         
     } catch (error) {
