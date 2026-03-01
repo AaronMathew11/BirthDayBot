@@ -307,7 +307,7 @@ module.exports = async (req, res) => {
         console.log(`📡 ${req.method} ${req.url}`, 'Headers:', req.headers.host);
         
         // Handle webhook
-        if (req.method === 'POST' && req.url === '/') {
+        if (req.method === 'POST' && (req.url === '/' || req.url === '/api/')) {
             if (!bot) {
                 return res.status(500).json({ error: 'Bot not initialized' });
             }
