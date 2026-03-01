@@ -316,7 +316,7 @@ module.exports = async (req, res) => {
         }
         
         // Health check
-        if (req.url === '/health' || req.url === '/api/health') {
+        if (req.url.includes('health')) {
             return res.status(200).json({
                 status: 'ok',
                 service: 'Telegram Birthday Bot',
@@ -326,11 +326,11 @@ module.exports = async (req, res) => {
         }
         
         // Set webhook
-        if (req.url === '/setup-webhook' || req.url === '/api/setup-webhook') {
+        if (req.url.includes('setup-webhook')) {
             if (!bot) {
                 return res.status(500).json({ error: 'Bot not initialized' });
             }
-            const webhookUrl = `https://${req.headers.host}/`;
+            const webhookUrl = `https://${req.headers.host}/api/`;
             await bot.setWebHook(webhookUrl);
             return res.status(200).json({ 
                 success: true, 
