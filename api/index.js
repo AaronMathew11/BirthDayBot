@@ -339,7 +339,7 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Home page
+        // Debug/Home page
         return res.status(200).send(`
             <html>
                 <head><title>🤖 Telegram Birthday Bot</title></head>
@@ -347,7 +347,9 @@ module.exports = async (req, res) => {
                     <h1>🎂 Telegram Birthday Bot</h1>
                     <p>Bot is running and ready!</p>
                     <p><strong>Bot:</strong> @nfc_birthday_bot</p>
-                    <p><a href="/health">Health Check</a> | <a href="/setup-webhook">Setup Webhook</a></p>
+                    <p><strong>Request URL:</strong> ${req.url}</p>
+                    <p><strong>Method:</strong> ${req.method}</p>
+                    <p><a href="/api/health">Health Check</a> | <a href="/api/setup-webhook">Setup Webhook</a></p>
                 </body>
             </html>
         `);
