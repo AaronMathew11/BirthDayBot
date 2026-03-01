@@ -1,6 +1,8 @@
 const TelegramBot = require('node-telegram-bot-api');
 const path = require('path');
 const fs = require('fs').promises;
+const axios = require('axios');
+const FormData = require('form-data');
 
 // Initialize components
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -98,6 +100,195 @@ function parseCSVLine(line) {
     
     fields.push(current); // Add the last field
     return fields;
+}
+
+// Canva API Integration
+async function createBirthdayPoster(person) {
+    const canvaToken = process.env.CANVA_API_TOKEN;
+    const templateId = process.env.CANVA_TEMPLATE_ID;
+    
+    if (!canvaToken || !templateId) {
+        console.error('Canva API token or template ID not configured');
+        return null;
+    }
+    
+    try {
+        // Step 1: Create design from template
+        const createDesignResponse = await axios.post(
+            'https://api.canva.com/rest/v1/designs',
+            {
+                design_type: 'Poster',
+                template_id: templateId
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${canvaToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        
+        const designId = createDesignResponse.data.design.id;
+        console.log(`📄 Created design: ${designId}`);
+        
+        // Step 2: Upload the person's image if available
+        let uploadedImageUrl = null;
+        if (person.photo && person.photo.includes('drive.google.com')) {
+            // Convert Google Drive link to direct download link
+            const fileId = extractGoogleDriveFileId(person.photo);
+            const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            
+            try {
+                const uploadResponse = await axios.post(
+                    'https://api.canva.com/rest/v1/uploads',
+                    {
+                        type: 'image',
+                        name: `${person.name}_photo.jpg`,
+                        url: directUrl
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${canvaToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                uploadedImageUrl = uploadResponse.data.upload.url;
+                console.log(`📸 Uploaded image for ${person.name}`);
+            } catch (uploadError) {
+                console.error(`Error uploading image for ${person.name}:`, uploadError.message);
+            }
+        }
+        
+        // Step 3: Update design elements (text and image)
+        const elements = [];
+        
+        // Add name text element
+        elements.push({
+            type: 'text',
+            text: person.name,
+            position: { x: 50, y: 50 }, // Adjust based on your template
+            font: {
+                size: 48,
+                weight: 'bold',
+                color: '#ffffff'
+            }
+        });
+        
+        // Add event type text
+        const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+        elements.push({
+            type: 'text', 
+            text: `Happy ${eventType}!`,
+            position: { x: 50, y: 120 },
+            font: {
+                size: 32,
+                color: '#ffffff'
+            }
+        });
+        
+        // Add date text
+        elements.push({
+            type: 'text',
+            text: person.date,
+            position: { x: 50, y: 180 },
+            font: {
+                size: 24,
+                color: '#ffffff'
+            }
+        });
+        
+        // Add image if available
+        if (uploadedImageUrl) {
+            elements.push({
+                type: 'image',
+                url: uploadedImageUrl,
+                position: { x: 300, y: 50 }, // Adjust based on your template
+                size: { width: 200, height: 200 }
+            });
+        }
+        
+        // Update the design with new elements
+        await axios.put(
+            `https://api.canva.com/rest/v1/designs/${designId}/elements`,
+            { elements: elements },
+            {
+                headers: {
+                    'Authorization': `Bearer ${canvaToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        
+        console.log(`✏️ Updated design elements for ${person.name}`);
+        
+        // Step 4: Export the design as PNG
+        const exportResponse = await axios.post(
+            `https://api.canva.com/rest/v1/designs/${designId}/export`,
+            {
+                format: 'png',
+                quality: 'standard'
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${canvaToken}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        
+        const exportJob = exportResponse.data.export_job;
+        
+        // Step 5: Poll for export completion
+        let exportUrl = null;
+        let attempts = 0;
+        const maxAttempts = 30; // 5 minutes max wait
+        
+        while (!exportUrl && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+            
+            const statusResponse = await axios.get(
+                `https://api.canva.com/rest/v1/export-jobs/${exportJob.id}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${canvaToken}`
+                    }
+                }
+            );
+            
+            if (statusResponse.data.export_job.status === 'success') {
+                exportUrl = statusResponse.data.export_job.url;
+                console.log(`🖼️ Export completed for ${person.name}: ${exportUrl}`);
+            } else if (statusResponse.data.export_job.status === 'failed') {
+                console.error(`Export failed for ${person.name}`);
+                break;
+            }
+            
+            attempts++;
+        }
+        
+        return exportUrl;
+        
+    } catch (error) {
+        console.error(`Error creating poster for ${person.name}:`, error.response?.data || error.message);
+        return null;
+    }
+}
+
+function extractGoogleDriveFileId(url) {
+    // Extract file ID from Google Drive URLs
+    const patterns = [
+        /\/file\/d\/([a-zA-Z0-9-_]+)/,
+        /id=([a-zA-Z0-9-_]+)/,
+        /\/d\/([a-zA-Z0-9-_]+)/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+    
+    return null;
 }
 
 function getThisWeeksBirthdays(birthdays) {
@@ -339,8 +530,50 @@ Let's get started! 🚀
         else if (text === '/thisweek') {
             const birthdays = await loadBirthdays();
             const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
-            const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
+            const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays & Anniversaries');
+            
+            // Send the text message first
             if (bot) await bot.sendMessage(chatId, responseMessage, { parse_mode: 'Markdown' });
+            
+            // Generate and send posters for each person
+            if (thisWeekBirthdays.length > 0) {
+                if (bot) await bot.sendMessage(chatId, '🎨 Creating personalized posters... Please wait!');
+                
+                for (const person of thisWeekBirthdays) {
+                    try {
+                        const posterUrl = await createBirthdayPoster(person);
+                        
+                        if (posterUrl) {
+                            const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+                            const caption = `🎉 ${eventType} poster for *${person.name}*\n📆 ${person.date}`;
+                            
+                            if (bot) {
+                                await bot.sendPhoto(chatId, posterUrl, {
+                                    caption: caption,
+                                    parse_mode: 'Markdown'
+                                });
+                            }
+                        } else {
+                            // Fallback if poster creation fails
+                            const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+                            const icon = person.type === 'anniversary' ? '💍' : '🎂';
+                            const fallbackMessage = `${icon} *${person.name}*\n📆 ${person.date}\n_(Poster creation temporarily unavailable)_`;
+                            
+                            if (bot) {
+                                await bot.sendMessage(chatId, fallbackMessage, { 
+                                    parse_mode: 'Markdown' 
+                                });
+                            }
+                        }
+                        
+                        // Add small delay between poster generations to avoid rate limits
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                    } catch (error) {
+                        console.error(`Error processing poster for ${person.name}:`, error);
+                    }
+                }
+            }
         }
         else if (text === '/nextweek') {
             const birthdays = await loadBirthdays();
@@ -427,8 +660,50 @@ Everything looks good! 🎉
             if (action === 'thisweek') {
                 const birthdays = await loadBirthdays();
                 const thisWeekBirthdays = getThisWeeksBirthdays(birthdays);
-                const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays');
+                const responseMessage = formatWeeklyMessage(thisWeekBirthdays, 'This Week\'s Birthdays & Anniversaries');
+                
+                // Send the text message first
                 if (bot) await bot.sendMessage(msgChatId, responseMessage, { parse_mode: 'Markdown' });
+                
+                // Generate and send posters for each person
+                if (thisWeekBirthdays.length > 0) {
+                    if (bot) await bot.sendMessage(msgChatId, '🎨 Creating personalized posters... Please wait!');
+                    
+                    for (const person of thisWeekBirthdays) {
+                        try {
+                            const posterUrl = await createBirthdayPoster(person);
+                            
+                            if (posterUrl) {
+                                const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+                                const caption = `🎉 ${eventType} poster for *${person.name}*\n📆 ${person.date}`;
+                                
+                                if (bot) {
+                                    await bot.sendPhoto(msgChatId, posterUrl, {
+                                        caption: caption,
+                                        parse_mode: 'Markdown'
+                                    });
+                                }
+                            } else {
+                                // Fallback if poster creation fails
+                                const eventType = person.type === 'anniversary' ? 'Anniversary' : 'Birthday';
+                                const icon = person.type === 'anniversary' ? '💍' : '🎂';
+                                const fallbackMessage = `${icon} *${person.name}*\n📆 ${person.date}\n_(Poster creation temporarily unavailable)_`;
+                                
+                                if (bot) {
+                                    await bot.sendMessage(msgChatId, fallbackMessage, { 
+                                        parse_mode: 'Markdown' 
+                                    });
+                                }
+                            }
+                            
+                            // Add small delay between poster generations to avoid rate limits
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            
+                        } catch (error) {
+                            console.error(`Error processing poster for ${person.name}:`, error);
+                        }
+                    }
+                }
             }
             else if (action === 'nextweek') {
                 const birthdays = await loadBirthdays();
